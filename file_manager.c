@@ -1,4 +1,5 @@
 #include <stdio.h>
+#include <stdlib.h>
 #include <string.h>
 #include <fcntl.h>
 #include <unistd.h>
@@ -28,16 +29,19 @@ void *pipeListener(char *pipeName) {
             while(clientInput[trav]) {
                 command[commandIx++] = clientInput[trav++]; 
             }
+            command[commandIx] = '\0';
             trav++;
             while(clientInput[trav]) {
                 file_name[fileNameIx++] = clientInput[trav++]; 
             }
+            file_name[fileNameIx] = '\0';
             
             if(commandCount > 2) {
                 trav++;
                 while(clientInput[trav]) {
                     data[dataIx++] = clientInput[trav++];
                 }
+                data[dataIx] = '\0';
             }
 
             printf("command: %s\n",command);
@@ -49,8 +53,6 @@ void *pipeListener(char *pipeName) {
         }
         
     }
-    
-
     return NULL;
 }
 
@@ -67,9 +69,9 @@ void *namePipe() {
         int ret = read(receive,str,80);
         if(ret != 0) {
             char pipeid[8] = "pipeid";
-            pipeid[6] = (char) threadIndex++;
+            pipeid[6] = (char) threadIndex;
             pipeid[7] = '\0';
-            pthread_create(threads+(threadIndex-49),NULL,pipeListener,pipeid);
+            pthread_create(threads+((threadIndex++)-48),NULL,pipeListener,pipeid);
             write(send,pipeid,strlen(pipeid));
             printf("connection made\n");
         }
