@@ -6,9 +6,55 @@
 #include <sys/types.h>
 #include <pthread.h>
 
-void *namePipe() {
-    int threadIndex = 48;
+int threadIndex = 48;
+const int numberOfThreads = 5;
+pthread_t threads[numberOfThreads];
 
+void *pipeListener(char *pipeName) {
+    mkfifo(pipeName,0666);
+    int clientListener = open(pipeName,O_RDONLY);
+    char clientInput[400];
+    while (1) {
+        int wantedTask = read(clientListener,clientInput,400);
+        if(wantedTask != 0) {
+            int commandCount = clientInput[0]-48;
+            printf("%s\n",clientInput);
+
+            char command[10]; int commandIx= 0;
+            char file_name[100]; int fileNameIx = 0;
+            char data[200]; int dataIx = 0;
+
+            int trav = 1;
+            while(clientInput[trav]) {
+                command[commandIx++] = clientInput[trav++]; 
+            }
+            trav++;
+            while(clientInput[trav]) {
+                file_name[fileNameIx++] = clientInput[trav++]; 
+            }
+            
+            if(commandCount > 2) {
+                trav++;
+                while(clientInput[trav]) {
+                    data[dataIx++] = clientInput[trav++];
+                }
+            }
+
+            printf("command: %s\n",command);
+            printf("file_name: %s\n",file_name);
+            if (commandCount >  2) {
+               printf("data: %s\n",data);
+            }
+            
+        }
+        
+    }
+    
+
+    return NULL;
+}
+
+void *namePipe() {
     char *managerSend = "MANAGERSEND";
     char *managerRecieve = "MANAGERRECEIVE";
     mkfifo(managerSend,0666);
@@ -23,7 +69,8 @@ void *namePipe() {
             char pipeid[8] = "pipeid";
             pipeid[6] = (char) threadIndex++;
             pipeid[7] = '\0';
-            write(send,pipeid,strlen(pipeid));            
+            pthread_create(threads+(threadIndex-49),NULL,pipeListener,pipeid);
+            write(send,pipeid,strlen(pipeid));
             printf("connection made\n");
         }
     }

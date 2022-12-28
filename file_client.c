@@ -35,8 +35,8 @@ int main() {
     close(receive);
     //----------------------------------------
 
-    
-
+    mkfifo(uniquePipeID,0666);
+    int customPipe = open(uniquePipeID,O_WRONLY);
    
     
     
@@ -56,7 +56,29 @@ int main() {
         }
 
         if(strcmp(inputs[0],"create") == 0) {
-            
+            if(ix == 2) {
+                int input0Len = strlen(inputs[0]); int input0Ix = 0;
+                int input1Len = strlen(inputs[1]); int input1Ix = 0;
+
+                char writtenData[400];
+                int trav = 0;
+                writtenData[trav++] = '2';
+
+                while(trav < input0Len+1) {
+                    writtenData[trav++] = inputs[0][input0Ix++];
+                }
+                writtenData[trav++] = '\0';
+
+                while(trav < input0Len+input1Len+2) {
+                    writtenData[trav++] = inputs[1][input1Ix++];
+                }
+                writtenData[trav] = '\0';
+                
+                write(customPipe,writtenData,400);
+            }
+            else {
+                printf("Wrong number of parameters...\n");
+            }
         }
         else if(strcmp(inputs[0],"delete") == 0) {
             printf("delete\n");
@@ -65,7 +87,35 @@ int main() {
             printf("read\n");
         }
         else if(strcmp(inputs[0],"write") == 0) {
-            printf("write\n");
+            if(ix == 3) { 
+                int input0Len = strlen(inputs[0]); int input0Ix = 0;
+                int input1Len = strlen(inputs[1]); int input1Ix = 0;
+                int input2Len = strlen(inputs[2]); int input2Ix = 0;
+
+                char writtenData[400];
+                int trav = 0;
+                writtenData[trav++] = '3';
+
+                while(trav < input0Len + 1) {
+                    writtenData[trav++] = inputs[0][input0Ix++];
+                }
+                writtenData[trav++] = '\0';
+
+                while (trav < input0Len + input1Len + 2) {
+                    writtenData[trav++] = inputs[1][input1Ix++];
+                }
+                writtenData[trav++] = '\0';
+
+                while (trav < input0Len + input1Len + input2Len + 3) {
+                    writtenData[trav++] = inputs[2][input2Ix++];
+                }
+                writtenData[trav] = '\0';
+
+                write(customPipe,writtenData,400);
+            }
+            else {
+                printf("Wrong number of parameters...\n");
+            }
         }
         else if(strcmp(inputs[0],"exit") == 0) {
             break;
