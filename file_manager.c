@@ -10,6 +10,7 @@
 int threadIndex = 48;
 const int numberOfThreads = 5;
 pthread_t threads[numberOfThreads];
+char *fileList[10];
 
 void *pipeListener(char *pipeName) {
     mkfifo(pipeName,0666);
@@ -35,7 +36,6 @@ void *pipeListener(char *pipeName) {
                 file_name[fileNameIx++] = clientInput[trav++]; 
             }
             file_name[fileNameIx] = '\0';
-            
             if(commandCount > 2) {
                 trav++;
                 while(clientInput[trav]) {
@@ -44,11 +44,33 @@ void *pipeListener(char *pipeName) {
                 data[dataIx] = '\0';
             }
 
-            printf("command: %s\n",command);
-            printf("file_name: %s\n",file_name);
-            if (commandCount >  2) {
-               printf("data: %s\n",data);
+            // printf("command: %s\n",command);
+            // printf("file_name: %s\n",file_name);
+            // if (commandCount >  2) {
+            //    printf("data: %s\n",data);
+            // }
+
+            if (strcmp(command,"create") == 0) {
+                int isExist = 0;
+                for(int x = 0 ; x < 10 ; x++) {
+                    if(strcmp(fileList[x],file_name) == 0) {
+                        isExist = 1;
+                    }
+                }
+                if(!isExist) {
+                    for(int x = 0 ; x < 10 ; x++) {
+                        if(strcmp(fileList[x],"NULL") == 0) {
+                            fileList[x] = file_name;
+                            printf("%s is added to filelist\n",file_name);
+                            break;
+                        }
+                    }
+                }
+                else {
+                    printf("this file is already exists\n");
+                }
             }
+            
             
         }
         
@@ -83,6 +105,10 @@ void *namePipe() {
 int main() {
     pthread_t pipeNameT;
     void *status;
+
+    for(int x = 0 ; x < 10 ; x++) {
+        fileList[x] = "NULL";
+    } 
 
     if(pthread_create(&pipeNameT, NULL, namePipe, NULL) != 0) {
         perror("Error: couldn't create pipeNameT...");
