@@ -1,79 +1,124 @@
 #include <stdio.h>
 #include <stdlib.h>
+#include <stdint.h>
 #include <string.h>
 #include <fcntl.h>
 #include <unistd.h>
+#include <pthread.h>
 #include <sys/stat.h>
 #include <sys/types.h>
-#include <pthread.h>
+
+pthread_t pipeNameT;
+void *status;
 
 int threadIndex = 48;
 const int numberOfThreads = 5;
 pthread_t threads[numberOfThreads];
-char *fileList[10];
+char fileList[10][100];
 
 void *pipeListener(char *pipeName) {
     mkfifo(pipeName,0666);
-    int clientListener = open(pipeName,O_RDONLY);
-    char clientInput[400];
+    
     while (1) {
+        int clientListener = open(pipeName,O_RDONLY);
+        char clientInput[400];
         int wantedTask = read(clientListener,clientInput,400);
-        if(wantedTask != 0) {
-            int commandCount = clientInput[0]-48;
-            printf("%s\n",clientInput);
+        close(clientListener);
+        int commandCount = clientInput[0]-48;
 
-            char command[10]; int commandIx= 0;
-            char file_name[100]; int fileNameIx = 0;
-            char data[200]; int dataIx = 0;
+        char command[10]; int commandIx = 0;
+        char file_name[100]; int fileNameIx = 0;
+        char data[200]; int dataIx = 0;
 
-            int trav = 1;
-            while(clientInput[trav]) {
-                command[commandIx++] = clientInput[trav++]; 
-            }
-            command[commandIx] = '\0';
-            trav++;
-            while(clientInput[trav]) {
-                file_name[fileNameIx++] = clientInput[trav++]; 
-            }
-            file_name[fileNameIx] = '\0';
-            if(commandCount > 2) {
-                trav++;
-                while(clientInput[trav]) {
-                    data[dataIx++] = clientInput[trav++];
-                }
-                data[dataIx] = '\0';
-            }
-
-            // printf("command: %s\n",command);
-            // printf("file_name: %s\n",file_name);
-            // if (commandCount >  2) {
-            //    printf("data: %s\n",data);
-            // }
-
-            if (strcmp(command,"create") == 0) {
-                int isExist = 0;
-                for(int x = 0 ; x < 10 ; x++) {
-                    if(strcmp(fileList[x],file_name) == 0) {
-                        isExist = 1;
-                    }
-                }
-                if(!isExist) {
-                    for(int x = 0 ; x < 10 ; x++) {
-                        if(strcmp(fileList[x],"NULL") == 0) {
-                            fileList[x] = file_name;
-                            printf("%s is added to filelist\n",file_name);
-                            break;
-                        }
-                    }
-                }
-                else {
-                    printf("this file is already exists\n");
-                }
-            }
-            
-            
+        int trav = 1;
+        while (clientInput[trav]) {
+            command[commandIx++] = clientInput[trav++];
         }
-        
+        command[commandIx] = '\0';
+        trav++;
+        while (clientInput[trav]) {
+            file_name[fileNameIx++] = clientInput[trav++];
+        }
+        file_name[fileNameIx] = '\0';
+        if(commandCount > 2) {
+            trav++;
+            while (clientInput[trav]) {
+                data[dataIx++] = clientInput[trav++];
+            }
+            data[dataIx] = '\0';
+        }
+
+        int isExist = 0;
+        for (int x = 0; x < 10; x++) {
+            if (strcmp(fileList[x], file_name) == 0) {
+                isExist = 1;
+            }
+        }
+
+        if(strcmp(command, "create") == 0) {
+            if(!isExist) {
+                for(int x = 0; x < 10; x++) {
+                    if(strcmp(fileList[x], "NULL") == 0) {
+                        strcpy(fileList[x], file_name);
+                        FILE *fp = fopen(file_name, "w");
+                        fclose(fp);
+                        break;
+                    }
+                }
+            }
+            int clientWriter = open(pipeName, O_WRONLY);
+            char *message = isExist ? "this file is already exists" : "file is created";
+            write(clientWriter, message, strlen(message));
+            close(clientWriter);
+        }
+        else if (strcmp(command, "delete") == 0) {
+            if (isExist) {
+                for (int x = 0; x < 10; x++) {
+                    if (strcmp(fileList[x], file_name) == 0) {
+                        strcpy(fileList[x], "NULL");
+                        remove(file_name);
+                        break;
+                    }
+                }
+            }
+            int clientWriter = open(pipeName, O_WRONLY);
+            char *message = !isExist ? "this file does not exist" : "file is deleted";
+            write(clientWriter, message, strlen(message));
+            close(clientWriter);
+        }
+        else if (strcmp(command, "write") == 0) {
+            if (isExist) {
+                FILE* fp = fopen(file_name, "w");
+                fprintf(fp, "%s", data);
+                fclose(fp);
+            }
+            int clientWriter = open(pipeName, O_WRONLY);
+            char *message = isExist ? "data is written to file" : "this file does not exist";
+            write(clientWriter, message, strlen(message));
+            close(clientWriter);
+        }
+        else if (strcmp(command, "read") == 0) {
+            char readedData[200];
+            if (isExist) {
+                FILE *fp = fopen(file_name, "r");
+                fgets(readedData, 200, fp);
+                fclose(fp);
+            }
+
+            int clientWriter = open(pipeName, O_WRONLY);
+            char *message = isExist ? readedData : "this file does not exist";
+            write(clientWriter, message, strlen(message));
+            close(clientWriter);
+        }
+        else if (strcmp(command, "exit") == 0) {
+            int clientWriter = open(pipeName, O_WRONLY);
+            char *message = "thread closed";
+            write(clientWriter, message, strlen(message));
+            close(clientWriter);
+            unlink(pipeName);
+            printf("connection closed\n");
+            break;
+        }
     }
     return NULL;
 }
@@ -103,11 +148,10 @@ void *namePipe() {
 }
 
 int main() {
-    pthread_t pipeNameT;
-    void *status;
+    
 
     for(int x = 0 ; x < 10 ; x++) {
-        fileList[x] = "NULL";
+        strcpy(fileList[x],"NULL");
     } 
 
     if(pthread_create(&pipeNameT, NULL, namePipe, NULL) != 0) {

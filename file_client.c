@@ -25,18 +25,14 @@ int main() {
     char *input = "newConnection";
     write(send,input,strlen(input)+1);
     close(send);
+    
+    read(receive,uniquePipeID,8);
+    printf("%s\n",uniquePipeID);
 
-    while (1) {
-        if(read(receive,uniquePipeID,8) != 0) {
-           printf("%s\n",uniquePipeID);
-           break;
-        }
-    }
     close(receive);
     //----------------------------------------
 
     mkfifo(uniquePipeID,0666);
-    int customPipe = open(uniquePipeID,O_WRONLY);
    
     
     
@@ -90,14 +86,52 @@ int main() {
                     writtenData[trav] = '\0';
                 }
 
-                write(customPipe,writtenData,400);
+                int customPipeWrite = open(uniquePipeID,O_WRONLY);
+                write(customPipeWrite,writtenData,400);
+                close(customPipeWrite);
+
+                int customPipeRead = open(uniquePipeID,O_RDONLY);
+                char message[200];
+                int lastIndex = read(customPipeRead,message,200);
+                close(customPipeRead);
+                message[lastIndex] = '\0';
+                printf("%s\n",message);
+
             }
             else {
                 printf("Wrong number of parameters...\n");
             }
         }
         else if(strcmp(inputs[0],"exit") == 0) {
-            break;
+            if(ix == 1) {
+                int input0Len = strlen(inputs[0]); int input0Ix = 0;
+
+                char writtenData[400];
+                int trav = 0;
+                writtenData[trav++] = '2';
+                while(trav < input0Len+1) {
+                    writtenData[trav++] = inputs[0][input0Ix++];
+                }
+                writtenData[trav++] = '\0';
+
+                int customPipeWrite = open(uniquePipeID,O_WRONLY);
+                write(customPipeWrite,writtenData,400);
+                close(customPipeWrite);
+
+                int customPipeRead = open(uniquePipeID,O_RDONLY);
+                char message[200];
+                int lastIndex = read(customPipeRead,message,200);
+                close(customPipeRead);
+                message[lastIndex] = '\0';
+                printf("%s\n",message);
+                unlink(uniquePipeID);
+                break; 
+            }
+            else {
+                printf("Wrong number of parameters...\n");
+            }
+            
+            
         }
         else {
             printf("unknown command\n");
