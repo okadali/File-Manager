@@ -35,10 +35,8 @@ int main() {
     mkfifo(uniquePipeID,0666);
    
     
-    
-
-
     while(1) {
+        //Reading user inputs-----------------
         input = readline("FileClient>>");
         if(strlen(input) == 0) {    
             continue;
@@ -50,9 +48,12 @@ int main() {
             inputs[ix++] = token;
             token = strtok(NULL," ");
         }
+        //------------------------------------
+
 
         if(strcmp(inputs[0],"create") == 0 || strcmp(inputs[0],"delete") == 0 || strcmp(inputs[0],"read") == 0 || strcmp(inputs[0],"write") == 0) {
             if((ix == 2 && strcmp(inputs[0],"write") != 0 ) || (ix == 3 && strcmp(inputs[0],"write") == 0)) {
+                //Putting user inputs together with \0 between them
                 int input0Len = strlen(inputs[0]); int input0Ix = 0;
                 int input1Len = strlen(inputs[1]); int input1Ix = 0;
                 int input2Len; int input2Ix = 0;
@@ -85,18 +86,22 @@ int main() {
                     }
                     writtenData[trav] = '\0';
                 }
+                //-----------------------------------------------
 
+                //Sending the commands to file_client------------
                 int customPipeWrite = open(uniquePipeID,O_WRONLY);
                 write(customPipeWrite,writtenData,400);
                 close(customPipeWrite);
+                //-----------------------------------------------
 
+                //Reading file clients output--------------------
                 int customPipeRead = open(uniquePipeID,O_RDONLY);
                 char message[200];
                 int lastIndex = read(customPipeRead,message,200);
                 close(customPipeRead);
                 message[lastIndex] = '\0';
                 printf("%s\n",message);
-
+                //-----------------------------------------------
             }
             else {
                 printf("Wrong number of parameters...\n");
@@ -130,15 +135,11 @@ int main() {
             else {
                 printf("Wrong number of parameters...\n");
             }
-            
-            
         }
         else {
             printf("unknown command\n");
         }
-        
     }
 
-    
     return 0;
 }

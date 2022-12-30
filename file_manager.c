@@ -11,19 +11,26 @@
 pthread_t pipeNameT;
 void *status;
 
+pthread_mutex_t lock;
+
 int threadIndex = 48;
 const int numberOfThreads = 5;
 pthread_t threads[numberOfThreads];
 char fileList[10][100];
+int isExit = 0;
 
 void *pipeListener(char *pipeName) {
+    char localPipeName[10];
+    strcpy(localPipeName,pipeName);
     mkfifo(pipeName,0666);
     
     while (1) {
-        int clientListener = open(pipeName,O_RDONLY);
+        int clientListener = open(localPipeName,O_RDONLY);
         char clientInput[400];
         int wantedTask = read(clientListener,clientInput,400);
         close(clientListener);
+
+        //Getting user input from file_client--------------
         int commandCount = clientInput[0]-48;
 
         char command[10]; int commandIx = 0;
@@ -47,6 +54,7 @@ void *pipeListener(char *pipeName) {
             }
             data[dataIx] = '\0';
         }
+        //-------------------------------------------------
 
         int isExist = 0;
         for (int x = 0; x < 10; x++) {
@@ -55,6 +63,7 @@ void *pipeListener(char *pipeName) {
             }
         }
 
+        
         if(strcmp(command, "create") == 0) {
             if(!isExist) {
                 for(int x = 0; x < 10; x++) {
@@ -66,10 +75,12 @@ void *pipeListener(char *pipeName) {
                     }
                 }
             }
-            int clientWriter = open(pipeName, O_WRONLY);
+            pthread_mutex_lock(&lock);
+            int clientWriter = open(localPipeName, O_WRONLY);
             char *message = isExist ? "this file is already exists" : "file is created";
             write(clientWriter, message, strlen(message));
             close(clientWriter);
+            pthread_mutex_unlock(&lock);
         }
         else if (strcmp(command, "delete") == 0) {
             if (isExist) {
@@ -81,10 +92,12 @@ void *pipeListener(char *pipeName) {
                     }
                 }
             }
-            int clientWriter = open(pipeName, O_WRONLY);
+            pthread_mutex_lock(&lock);
+            int clientWriter = open(localPipeName, O_WRONLY);
             char *message = !isExist ? "this file does not exist" : "file is deleted";
             write(clientWriter, message, strlen(message));
             close(clientWriter);
+            pthread_mutex_unlock(&lock);
         }
         else if (strcmp(command, "write") == 0) {
             if (isExist) {
@@ -92,10 +105,12 @@ void *pipeListener(char *pipeName) {
                 fprintf(fp, "%s", data);
                 fclose(fp);
             }
-            int clientWriter = open(pipeName, O_WRONLY);
+            pthread_mutex_lock(&lock);
+            int clientWriter = open(localPipeName, O_WRONLY);
             char *message = isExist ? "data is written to file" : "this file does not exist";
             write(clientWriter, message, strlen(message));
             close(clientWriter);
+            pthread_mutex_unlock(&lock);
         }
         else if (strcmp(command, "read") == 0) {
             char readedData[200];
@@ -105,18 +120,22 @@ void *pipeListener(char *pipeName) {
                 fclose(fp);
             }
 
-            int clientWriter = open(pipeName, O_WRONLY);
+            pthread_mutex_lock(&lock);
+            int clientWriter = open(localPipeName, O_WRONLY);
             char *message = isExist ? readedData : "this file does not exist";
             write(clientWriter, message, strlen(message));
             close(clientWriter);
+            pthread_mutex_unlock(&lock);
         }
         else if (strcmp(command, "exit") == 0) {
-            int clientWriter = open(pipeName, O_WRONLY);
+            pthread_mutex_lock(&lock);
+            int clientWriter = open(localPipeName, O_WRONLY);
             char *message = "thread closed";
             write(clientWriter, message, strlen(message));
             close(clientWriter);
-            unlink(pipeName);
+            unlink(localPipeName);
             printf("connection closed\n");
+            pthread_mutex_unlock(&lock);
             break;
         }
     }
@@ -132,7 +151,8 @@ void *namePipe() {
     int send = open(managerSend,O_WRONLY);
     char str[80];
 
-    while (1) {
+    //Checks if any new file_client opened, if there is one a thread will be assing to them
+    while (!isExit) {
         int ret = read(receive,str,80);
         if(ret != 0) {
             char pipeid[8] = "pipeid";
@@ -143,24 +163,47 @@ void *namePipe() {
             printf("connection made\n");
         }
     }
+    //-----------------------------------------------------
 
+    unlink(managerSend);
+    unlink(managerRecieve);
+    close(receive);
+    close(send);
     return NULL;
 }
 
 int main() {
-    
-
+    //Initilizing every name on the filelist as NULL-------
     for(int x = 0 ; x < 10 ; x++) {
         strcpy(fileList[x],"NULL");
     } 
+    //-----------------------------------------------------
 
     if(pthread_create(&pipeNameT, NULL, namePipe, NULL) != 0) {
         perror("Error: couldn't create pipeNameT...");
         return 1;
     }
+
+    //if the user input is exit namePipe thread will end---
+    while (1) {
+        char input[40];
+        scanf("%s",input);
+        if(strcmp(input,"exit") == 0) {
+            isExit = 1;
+            break;
+        }
+    }
+    //-----------------------------------------------------
+    
     if(pthread_join(pipeNameT, &status) != 0) {
         perror("phtread_join");
         return 1;
+    }
+    for(int x = 0 ; x < threadIndex-48 ; x++) {
+        if (pthread_join(threads[x], &status) != 0) {
+            perror("phtread_join");
+            return 1;
+        }  
     }
 
     return 0;
